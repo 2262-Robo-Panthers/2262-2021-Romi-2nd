@@ -5,7 +5,6 @@
 package frc.robot;
 
 import java.io.IOException;
-import java.nio.file.Path;
 
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Filesystem;
@@ -52,17 +51,11 @@ public class RobotContainer {
 	 */
 	public Command getAutonomousCommand() {
 
-		final DifferentialDriveKinematics driveKinematics =
-			new DifferentialDriveKinematics(Constants.kTrackwidthMeters);
-
-		final SimpleMotorFeedforward driveFeedforward =
-			new SimpleMotorFeedforward(Constants.ksVolts, Constants.kvVoltSecondsPerMeter, Constants.kaVoltSecondsSquaredPerMeter);
-
 		final String trajectoryJSON = "paths/Auto.wpilib.json";
 		Trajectory autoTrajectory = new Trajectory();
 		try {
-			final Path trajectoryPath = Filesystem.getDeployDirectory().toPath().resolve(trajectoryJSON);
-			autoTrajectory = TrajectoryUtil.fromPathweaverJson(trajectoryPath);
+			autoTrajectory = TrajectoryUtil
+				.fromPathweaverJson(Filesystem.getDeployDirectory().toPath().resolve(trajectoryJSON));
 		} catch (IOException ex) {
 			DriverStation.reportError("Unable to open trajectory: " + trajectoryJSON, ex.getStackTrace());
 		}
@@ -71,11 +64,11 @@ public class RobotContainer {
 			autoTrajectory,
 			m_romiDrivetrain::getPose,
 			new RamseteController(Constants.kRamseteB, Constants.kRamseteZeta),
-			driveFeedforward,
-			driveKinematics,
+			new SimpleMotorFeedforward(Constants.ksVolts, Constants.kvVoltSecondsPerMeter, Constants.kaVoltSecondsSquaredPerMeter),
+			new DifferentialDriveKinematics(Constants.kTrackwidthMeters),
 			m_romiDrivetrain::getWheelSpeeds,
-			new PIDController(Constants.kPDriveVel, 0.0, 0.0),
-			new PIDController(Constants.kPDriveVel, 0.0, 0.0),
+			m_romiDrivetrain.getLeftPID(),
+			m_romiDrivetrain.getRightPID(),
 			m_romiDrivetrain::tankDriveVolts,
 			m_romiDrivetrain
 		);
@@ -96,14 +89,14 @@ public class RobotContainer {
 	 */
 	private void configureButtonBindings() {
 		m_romiDrivetrain.setDefaultCommand(
-			new InstantCommand(() -> m_romiDrivetrain.resetOdometry(Constants.kInitialPose), m_romiDrivetrain)
-			.andThen(
-				new DriveCommand(
-					m_romiDrivetrain,
-					() -> -m_controller.getY(Hand.kLeft),
-					() -> m_controller.getX(Hand.kRight),
-					() -> m_controller.getBumper(Hand.kRight)
-				)));
+			new DriveCommand(
+				m_romiDrivetrain,
+				() -> -m_controller.getY(Hand.kLeft),
+				() -> m_controller.getX(Hand.kRight),
+				() -> m_controller.getBumper(Hand.kRight)));
 	}
 
+	public Command getTeleopResetCommand() {
+		return new InstantCommand(() -> m_romiDrivetrain.resetOdometry(Constants.kTeleopStartPose), m_romiDrivetrain);
+	}
 }

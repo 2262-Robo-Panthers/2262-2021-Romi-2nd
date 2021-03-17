@@ -18,19 +18,18 @@ import edu.wpi.first.wpilibj.geometry.Rotation2d;
  * wherever the constants are needed, to reduce verbosity.
  */
 public final class Constants {
-	public static final double ksVolts = 0.6666;
+	public static final double ksVolts = 0.74;
 	public static final double kvVoltSecondsPerMeter = 8.32;
 	public static final double kaVoltSecondsSquaredPerMeter = 0.0272;
-	public static final double kPDriveVel = 0.0104;
+	public static final double kPDriveVel = 0.0;
 
-	public static final Pose2d kInitialPose = new Pose2d(0.27355109961190166, 0.5559741267787839, new Rotation2d(0.015705514831139075));
+	public static final Pose2d kTeleopStartPose = new Pose2d(0.27355109961190166, 0.5559741267787839,
+		new Rotation2d(0.015705514831139075));
 
 	public static final double kTrackwidthMeters = 0.142072613;
-	public static final double kMaxSpeedMetersPerSecond = 0.8;
-	public static final double kMaxAccelerationMetersPerSecondSquared = 0.8;
 
 	// Reasonable baseline values for a RAMSETE follower in units of meters and
 	// seconds
-	public static final double kRamseteB = 10;
-	public static final double kRamseteZeta = 0.35;
+	public static final double kRamseteB = 2;
+	public static final double kRamseteZeta = 0.7;
 }

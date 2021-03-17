@@ -4,16 +4,19 @@
 
 package frc.robot.subsystems;
 
+import edu.wpi.first.wpilibj.BuiltInAccelerometer;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.Spark;
+import edu.wpi.first.wpilibj.controller.PIDController;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.estimator.DifferentialDrivePoseEstimator;
 import edu.wpi.first.wpilibj.geometry.Pose2d;
-import edu.wpi.first.wpilibj.geometry.Rotation2d;
-import edu.wpi.first.wpilibj.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.wpilibj.interfaces.Accelerometer.Range;
 import edu.wpi.first.wpilibj.kinematics.DifferentialDriveWheelSpeeds;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpiutil.math.VecBuilder;
 import frc.robot.Constants;
 import frc.robot.sensors.RomiGyro;
 
@@ -33,26 +36,47 @@ public class RomiDrivetrain extends SubsystemBase {
 
 	private final RomiGyro m_gyro = new RomiGyro();
 
+	@SuppressWarnings("unused")
+	private final BuiltInAccelerometer m_accelerometer = new BuiltInAccelerometer(Range.k2G);
+
 	// Set up the differential drive controller
 	private final DifferentialDrive m_diffDrive = new DifferentialDrive(m_leftMotor, m_rightMotor);
 
-	private final DifferentialDriveOdometry m_odometry;
+	private final PIDController m_leftPID = new PIDController(Constants.kPDriveVel, 0, 0);
+	private final PIDController m_rightPID = new PIDController(Constants.kPDriveVel, 0, 0);
+
+	private final DifferentialDrivePoseEstimator m_globalPoseObserver = new DifferentialDrivePoseEstimator(
+		m_gyro.getRotation2d(),
+		Constants.kTeleopStartPose,
+		VecBuilder.fill(0.02, 0.02, 0.01, 0.02, 0.02),
+		VecBuilder.fill(0.02, 0.02, 0.01),
+		VecBuilder.fill(0.1, 0.1, 0.01),
+		0.02
+	);
 
 	private final Field2d m_field = new Field2d();
 
 	/** Creates a new RomiDrivetrain. */
 	public RomiDrivetrain() {
-		// Use inches as unit for encoder distances
+		// Use meters as unit for encoder distances
 		m_leftEncoder.setDistancePerPulse((Math.PI * kWheelDiameterMeter) / kCountsPerRevolution);
 		m_rightEncoder.setDistancePerPulse((Math.PI * kWheelDiameterMeter) / kCountsPerRevolution);
 		resetEncoders();
 
-		m_odometry = new DifferentialDriveOdometry(getRotation2d(), Constants.kInitialPose);
 		SmartDashboard.putData("field", m_field);
 	}
 
-	public void curvatureDrive(double xaxisSpeed, double zaxisRotate, boolean isQuickTurn) {
-		m_diffDrive.curvatureDrive(xaxisSpeed, zaxisRotate, isQuickTurn);
+	@Override
+	public void periodic() {
+		// This method will be called once per scheduler run
+		m_field.setRobotPose(m_globalPoseObserver.update(m_gyro.getRotation2d(), getWheelSpeeds(),
+			m_leftEncoder.getDistance(), m_rightEncoder.getDistance()));
+		SmartDashboard.putNumber("Left Error", m_leftPID.getPositionError());
+		SmartDashboard.putNumber("Right Error", m_rightPID.getPositionError());
+	}
+
+	public void curvatureDrive(double xSpeed, double zRotation, boolean isQuickTurn) {
+		m_diffDrive.curvatureDrive(xSpeed, zRotation, isQuickTurn);
 	}
 
 	public void resetEncoders() {
@@ -61,32 +85,16 @@ public class RomiDrivetrain extends SubsystemBase {
 	}
 
 	public void stopDrivetrain() {
-		tankDriveVolts(0, 0);
-	}
-
-	public double getLeftDistanceMeter() {
-		return m_leftEncoder.getDistance();
-	}
-
-	public double getRightDistanceMeter() {
-		return m_rightEncoder.getDistance();
-	}
-
-	public double getAngle() {
-		return m_gyro.getAngleZ();
-	}
-
-	public Rotation2d getRotation2d() {
-		return Rotation2d.fromDegrees(-getAngle());
+		m_diffDrive.stopMotor();
 	}
 
 	public void resetOdometry(Pose2d pose) {
 		resetEncoders();
-		m_odometry.resetPosition(pose, getRotation2d());
+		m_globalPoseObserver.resetPosition(pose, m_gyro.getRotation2d());
 	}
 
 	public Pose2d getPose() {
-		return m_odometry.getPoseMeters();
+		return m_globalPoseObserver.getEstimatedPosition();
 	}
 
 	public DifferentialDriveWheelSpeeds getWheelSpeeds() {
@@ -94,21 +102,17 @@ public class RomiDrivetrain extends SubsystemBase {
 	}
 
 	public void tankDriveVolts(double leftVolts, double rightVolts) {
-		m_leftMotor.setVoltage(leftVolts);
-		m_rightMotor.setVoltage(-rightVolts);
+		m_leftMotor.setVoltage(leftVolts * (0.67 / 0.72));
+		m_rightMotor.setVoltage(-rightVolts * (0.72 / 0.67));
 		m_diffDrive.feed();
 	}
 
-	@Override
-	public void periodic() {
-		// This method will be called once per scheduler run
-		m_odometry.update(getRotation2d(), getLeftDistanceMeter(), getRightDistanceMeter());
-
-		m_field.setRobotPose(getPose());
+	public PIDController getLeftPID() {
+		return m_leftPID;
 	}
 
-	@Override
-	public void simulationPeriodic() {
-		// This method will be called once per scheduler run during simulation
+	public PIDController getRightPID() {
+		return m_rightPID;
 	}
+
 }
